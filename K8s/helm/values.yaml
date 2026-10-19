@@ -62,3 +62,6 @@ shipping: {}
 user: {}
 
 web: {}
+
+load:
+  enabled: true
