@@ -1,0 +1,45 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: robot-shop-slo-rules
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: kube-prometheus-stack
+spec:
+  groups:
+    - name: robot-shop-slo.rules
+      rules:
+        - alert: RobotShopServiceDown
+          expr: kube_deployment_status_replicas_available{namespace="robot-shop", deployment=~"web|cart|catalogue|payment"} == 0
+          for: 15s
+          labels:
+            severity: critical
+            slo: availability
+            tier: storefront
+          annotations:
+            summary: "Robot Shop service {{ $labels.deployment }} is down"
+            description: "Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} has 0 available replicas. Immediate risk to 99.5% Availability SLO."
+            runbook_url: "file:///home/faruk/robot-shop/observability/runbook/runbook.md"
+
+        - alert: RobotShopHighRestarts
+          expr: increase(kube_pod_container_status_restarts_total{namespace="robot-shop", container=~"web|cart|catalogue|payment"}[15m]) > 2
+          for: 1m
+          labels:
+            severity: warning
+            slo: stability
+          annotations:
+            summary: "Container {{ $labels.container }} restarting frequently"
+            description: "Pod {{ $labels.pod }} restarted {{ $value }} times within the last 15 minutes."
+            runbook_url: "file:///home/faruk/robot-shop/observability/runbook/runbook.md"
+
+        - alert: RobotShopErrorBudgetBurnFast
+          expr: sum(rate(container_cpu_cfs_throttled_periods_total{namespace="robot-shop", pod=~"(web|cart|catalogue|payment)-.*"}[5m])) > 100
+          for: 2m
+          labels:
+            severity: warning
+            slo: latency
+          annotations:
+            summary: "High CPU throttling on core service {{ $labels.pod }}"
+            description: "Core service {{ $labels.pod }} is experiencing severe CPU throttling which impairs latency SLO."
+            runbook_url: "file:///home/faruk/robot-shop/observability/runbook/runbook.md"
